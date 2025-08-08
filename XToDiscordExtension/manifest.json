@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "XToDiscordExtension",
+  "version": "1.0",
+  "description": "XポストをDiscordに転送するChrome拡張機能",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://twitter.com/*",
+    "https://x.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://twitter.com/*", "https://x.com/*"],
+      "js": ["content.js", "utils/discord.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Discord Webhook設定"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["styles.css"],
+      "matches": ["https://twitter.com/*", "https://x.com/*"]
+    }
+  ]
+}

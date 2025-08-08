@@ -1,0 +1,141 @@
+/* XToDiscordExtension スタイル */
+
+/* Discordボタンのスタイル */
+.xtodiscord-button {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 8px;
+    margin-left: 12px;
+    background-color: #5865f2;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: normal;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    transition: all 0.2s ease;
+    min-height: 24px;
+    box-sizing: border-box;
+}
+
+.xtodiscord-button:hover {
+    background-color: #4752c4;
+    transform: translateY(-1px);
+}
+
+.xtodiscord-button:active {
+    transform: translateY(0);
+}
+
+.xtodiscord-button:disabled {
+    background-color: #99aab5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.xtodiscord-button svg {
+    flex-shrink: 0;
+}
+
+/* 通知スタイル */
+.xtodiscord-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideInRight 0.3s ease-out;
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.xtodiscord-notification.success {
+    background-color: #00d26a;
+    color: white;
+}
+
+.xtodiscord-notification.error {
+    background-color: #f23f43;
+    color: white;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+    .xtodiscord-button {
+        background-color: #5865f2;
+        color: white;
+    }
+    
+    .xtodiscord-button:hover {
+        background-color: #4752c4;
+    }
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .xtodiscord-button {
+        font-size: 11px;
+        padding: 3px 6px;
+        margin-left: 8px;
+        min-height: 20px;
+        gap: 1px;
+    }
+    
+    .xtodiscord-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        font-size: 13px;
+    }
+}
+
+/* X/Twitter のUIに合わせた調整 */
+[data-testid="tweet"] .xtodiscord-button,
+article[role="article"] .xtodiscord-button {
+    margin-left: 12px;
+}
+
+/* 高コントラストモード対応 */
+@media (prefers-contrast: high) {
+    .xtodiscord-button {
+        border: 2px solid #ffffff;
+    }
+    
+    .xtodiscord-button:hover {
+        border-color: #ffffff;
+    }
+}
+
+/* 動きを減らす設定に対応 */
+@media (prefers-reduced-motion: reduce) {
+    .xtodiscord-button {
+        transition: none;
+    }
+    
+    .xtodiscord-button:hover {
+        transform: none;
+    }
+    
+    .xtodiscord-notification {
+        animation: none;
+    }
+}
