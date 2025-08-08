@@ -140,10 +140,14 @@ function handleDiscordButtonClick(post) {
         return;
     }
     
-    // Discordに送信
-    sendToDiscord(postData)
+    // ブックマークを確認・追加してからDiscordに送信
+    addToBookmarkIfNeeded(post)
         .then(() => {
-            showNotification('Discordに送信しました！', 'success');
+            // Discordに送信
+            return sendToDiscord(postData);
+        })
+        .then(() => {
+            showNotification('ブックマーク追加 & Discordに送信しました！', 'success');
         })
         .catch((error) => {
             console.error('[XToDiscord] Send failed:', error);
@@ -154,19 +158,182 @@ function handleDiscordButtonClick(post) {
         });
 }
 
+function addToBookmarkIfNeeded(post) {
+    return new Promise((resolve, reject) => {
+        try {
+            // ブックマークボタンを探す（複数のセレクターで試行）
+            let bookmarkButton = null;
+            
+            // 試行1: data-testid="bookmark"
+            bookmarkButton = post.querySelector('[data-testid="bookmark"]');
+            
+            // 試行2: aria-labelでブックマーク関連を探す
+            if (!bookmarkButton) {
+                const buttons = post.querySelectorAll('button, div[role="button"]');
+                for (const button of buttons) {
+                    const ariaLabel = button.getAttribute('aria-label');
+                    if (ariaLabel && (
+                        ariaLabel.includes('ブックマーク') ||
+                        ariaLabel.includes('Bookmark') ||
+                        ariaLabel.includes('bookmark')
+                    )) {
+                        bookmarkButton = button;
+                        break;
+                    }
+                }
+            }
+            
+            // 試行3: SVGの形状でブックマークボタンを判定
+            if (!bookmarkButton) {
+                const svgElements = post.querySelectorAll('svg');
+                for (const svg of svgElements) {
+                    const path = svg.querySelector('path');
+                    if (path) {
+                        const d = path.getAttribute('d');
+                        // ブックマークアイコンのpath（空のブックマーク）
+                        if (d && (d.includes('M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z') ||
+                                 d.includes('M3 4.5C3 3.12 4.12 2 5.5 2h13C19.88 2 21 3.12 21 4.5v18.44L12 16.5l-9 6.44V4.5z'))) {
+                            bookmarkButton = svg.closest('button, div[role="button"]');
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (!bookmarkButton) {
+                console.log('[XToDiscord] Bookmark button not found');
+                resolve(); // ボタンが見つからなくても続行
+                return;
+            }
+            
+            console.log('[XToDiscord] Found bookmark button:', bookmarkButton);
+            
+            // ブックマーク状態を確認
+            const isBookmarked = checkIfBookmarked(bookmarkButton);
+            
+            if (isBookmarked) {
+                console.log('[XToDiscord] Already bookmarked');
+                resolve();
+                return;
+            }
+            
+            // ブックマークボタンをクリック
+            console.log('[XToDiscord] Adding bookmark...');
+            bookmarkButton.click();
+            
+            // 少し待ってから完了
+            setTimeout(() => {
+                console.log('[XToDiscord] Bookmark added successfully');
+                resolve();
+            }, 500);
+            
+        } catch (error) {
+            console.error('[XToDiscord] Bookmark error:', error);
+            resolve(); // エラーが発生してもDiscord送信は続行
+        }
+    });
+}
+
+function checkIfBookmarked(bookmarkButton) {
+    // 方法1: aria-labelをチェック
+    const ariaLabel = bookmarkButton.getAttribute('aria-label');
+    if (ariaLabel) {
+        // 既にブックマーク済みの場合のラベル
+        if (ariaLabel.includes('ブックマークを削除') || 
+            ariaLabel.includes('Remove from Bookmarks') ||
+            ariaLabel.includes('Remove Bookmark') ||
+            ariaLabel.includes('Bookmarked')) {
+            return true;
+        }
+    }
+    
+    // 方法2: SVGアイコンの状態をチェック
+    const svg = bookmarkButton.querySelector('svg');
+    if (svg) {
+        const paths = svg.querySelectorAll('path');
+        for (const path of paths) {
+            const d = path.getAttribute('d');
+            if (d) {
+                // ブックマーク済みの場合は塗りつぶされたアイコン
+                // 塗りつぶしブックマークのpathパターンをチェック
+                if (d.includes('M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z') ||
+                    d.includes('M3 4.5C3 3.12 4.12 2 5.5 2h13C19.88 2 21 3.12 21 4.5v18.44L12 16.5l-9 6.44V4.5z')) {
+                    // これらは実際には空のブックマークなので、fillをチェック
+                    const fill = path.getAttribute('fill');
+                    if (fill && fill !== 'none' && fill !== 'transparent') {
+                        return true;
+                    }
+                } else if (d.length < 100) {
+                    // 短いpathは塗りつぶしブックマークの可能性が高い
+                    return true;
+                }
+            }
+        }
+    }
+    
+    // 方法3: クラス名でチェック
+    if (bookmarkButton.classList.contains('bookmarked') || 
+        bookmarkButton.classList.contains('active')) {
+        return true;
+    }
+    
+    return false;
+}
+
 function extractPostData(post) {
     try {
-        // ポストのテキスト内容を取得
-        const textElements = post.querySelectorAll('[data-testid="tweetText"]');
+        // ポストのテキスト内容を取得（複数のセレクターで試行）
         let text = '';
+        
+        // 試行1: data-testid="tweetText"
+        let textElements = post.querySelectorAll('[data-testid="tweetText"]');
         if (textElements.length > 0) {
             text = Array.from(textElements).map(el => el.textContent).join(' ');
         }
         
-        // ユーザー名を取得
-        const usernameElement = post.querySelector('[data-testid="User-Name"] a');
+        // 試行2: lang属性を持つdiv（ツイートテキストによくある）
+        if (!text) {
+            textElements = post.querySelectorAll('div[lang]');
+            if (textElements.length > 0) {
+                // 最も長いテキストを選択（通常はメインのツイートテキスト）
+                const longestElement = Array.from(textElements).reduce((prev, current) => {
+                    return (current.textContent.length > prev.textContent.length) ? current : prev;
+                });
+                text = longestElement.textContent;
+            }
+        }
+        
+        // 試行3: span要素内のテキストを収集
+        if (!text) {
+            textElements = post.querySelectorAll('div[dir] span');
+            if (textElements.length > 0) {
+                text = Array.from(textElements)
+                    .map(el => el.textContent)
+                    .filter(t => t.length > 10) // 短すぎるテキストを除外
+                    .join(' ');
+            }
+        }
+        
+        console.log('[XToDiscord] Extracted text:', text);
+        
+        // ユーザー名を取得（複数の方法で試行）
         let username = '';
         let userHandle = '';
+        
+        // 試行1: data-testid="User-Name"
+        let usernameElement = post.querySelector('[data-testid="User-Name"] a, [data-testid="User-Name"] span');
+        if (!usernameElement) {
+            // 試行2: href属性に/で始まるリンクを探す
+            const links = post.querySelectorAll('a[href^="/"]');
+            for (const link of links) {
+                const href = link.getAttribute('href');
+                if (href && href.match(/^\/[a-zA-Z0-9_]+$/)) {
+                    usernameElement = link;
+                    break;
+                }
+            }
+        }
+        
         if (usernameElement) {
             const href = usernameElement.getAttribute('href');
             if (href) {
@@ -175,6 +342,8 @@ function extractPostData(post) {
             username = usernameElement.textContent || userHandle;
         }
         
+        console.log('[XToDiscord] Extracted username:', username);
+        
         // ポストURLを構築（可能な場合）
         let postUrl = '';
         const timeElement = post.querySelector('time');
@@ -182,6 +351,17 @@ function extractPostData(post) {
             const href = timeElement.parentElement.getAttribute('href');
             postUrl = `https://x.com${href}`;
         }
+        
+        // timeElementが見つからない場合の代替方法
+        if (!postUrl) {
+            const statusLinks = post.querySelectorAll('a[href*="/status/"]');
+            if (statusLinks.length > 0) {
+                const href = statusLinks[0].getAttribute('href');
+                postUrl = `https://x.com${href}`;
+            }
+        }
+        
+        console.log('[XToDiscord] Extracted postUrl:', postUrl);
         
         return {
             text: text || 'テキストなし',
