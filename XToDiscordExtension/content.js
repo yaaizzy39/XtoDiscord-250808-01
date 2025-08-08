@@ -209,21 +209,29 @@ function addToBookmarkIfNeeded(post) {
             console.log('[XToDiscord] Found bookmark button:', bookmarkButton);
             
             // ブックマーク状態を確認
+            console.log('[XToDiscord] === BEFORE CLICK ===');
             const isBookmarked = checkIfBookmarked(bookmarkButton);
             
             if (isBookmarked) {
-                console.log('[XToDiscord] Already bookmarked');
+                console.log('[XToDiscord] ✅ Already bookmarked - keeping bookmark ON');
                 resolve();
                 return;
             }
             
-            // ブックマークボタンをクリック
-            console.log('[XToDiscord] Adding bookmark...');
+            // ブックマークがOFFの場合のみONにする
+            console.log('[XToDiscord] ❌ Bookmark is OFF - turning ON...');
+            console.log('[XToDiscord] Clicking bookmark button...');
             bookmarkButton.click();
             
-            // 少し待ってから完了
+            // 少し待ってからブックマーク追加を確認
             setTimeout(() => {
-                console.log('[XToDiscord] Bookmark added successfully');
+                console.log('[XToDiscord] === AFTER CLICK ===');
+                const nowBookmarked = checkIfBookmarked(bookmarkButton);
+                if (nowBookmarked) {
+                    console.log('[XToDiscord] ✅ Bookmark successfully turned ON');
+                } else {
+                    console.log('[XToDiscord] ⚠️ Bookmark add may have failed, but continuing...');
+                }
                 resolve();
             }, 500);
             
@@ -235,48 +243,114 @@ function addToBookmarkIfNeeded(post) {
 }
 
 function checkIfBookmarked(bookmarkButton) {
+    console.log('[XToDiscord] Checking bookmark status...');
+    
     // 方法1: aria-labelをチェック
     const ariaLabel = bookmarkButton.getAttribute('aria-label');
+    console.log('[XToDiscord] Aria-label:', ariaLabel);
+    
     if (ariaLabel) {
         // 既にブックマーク済みの場合のラベル
-        if (ariaLabel.includes('ブックマークを削除') || 
-            ariaLabel.includes('Remove from Bookmarks') ||
-            ariaLabel.includes('Remove Bookmark') ||
-            ariaLabel.includes('Bookmarked')) {
-            return true;
+        const bookmarkedLabels = [
+            'ブックマークを削除',
+            'ブックマークから削除',
+            'ブックマークに追加済み',  // ← これが重要！
+            'ブックマーク済み',
+            'Remove from Bookmarks',
+            'Remove Bookmark',
+            'Bookmarked',
+            'Remove from bookmarks',
+            'Unbookmark',
+            'Added to Bookmarks'
+        ];
+        
+        for (const label of bookmarkedLabels) {
+            if (ariaLabel.includes(label)) {
+                console.log('[XToDiscord] Found bookmarked aria-label:', label);
+                return true;
+            }
+        }
+        
+        // 明確にブックマークを追加する（未ブックマーク）場合のラベル
+        const unbookmarkedLabels = [
+            'ブックマークに追加',
+            'ブックマーク',
+            'Add to Bookmarks',
+            'Bookmark'
+        ];
+        
+        for (const label of unbookmarkedLabels) {
+            // 「追加済み」が含まれていない場合のみ未ブックマーク判定
+            if (ariaLabel === label || 
+                (ariaLabel.includes(label) && 
+                 !ariaLabel.includes('済み') && 
+                 !ariaLabel.includes('削除') && 
+                 !ariaLabel.includes('Remove'))) {
+                console.log('[XToDiscord] Found unbookmarked aria-label:', label);
+                return false;
+            }
         }
     }
     
-    // 方法2: SVGアイコンの状態をチェック
+    // 方法2: SVGアイコンの詳細チェック
     const svg = bookmarkButton.querySelector('svg');
     if (svg) {
+        console.log('[XToDiscord] Checking SVG paths...');
         const paths = svg.querySelectorAll('path');
+        
         for (const path of paths) {
             const d = path.getAttribute('d');
+            const fill = path.getAttribute('fill');
+            const style = path.getAttribute('style');
+            
+            console.log('[XToDiscord] Path d:', d);
+            console.log('[XToDiscord] Path fill:', fill);
+            console.log('[XToDiscord] Path style:', style);
+            
             if (d) {
-                // ブックマーク済みの場合は塗りつぶされたアイコン
-                // 塗りつぶしブックマークのpathパターンをチェック
-                if (d.includes('M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z') ||
-                    d.includes('M3 4.5C3 3.12 4.12 2 5.5 2h13C19.88 2 21 3.12 21 4.5v18.44L12 16.5l-9 6.44V4.5z')) {
-                    // これらは実際には空のブックマークなので、fillをチェック
-                    const fill = path.getAttribute('fill');
-                    if (fill && fill !== 'none' && fill !== 'transparent') {
+                // 塗りつぶされたブックマークアイコンのパターン
+                const filledBookmarkPatterns = [
+                    'M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5Z',
+                    'M3 4.5C3 3.12 4.12 2 5.5 2h13C19.88 2 21 3.12 21 4.5v18.44L12 16.5l-9 6.44V4.5Z'
+                ];
+                
+                // exactな一致をチェック
+                for (const pattern of filledBookmarkPatterns) {
+                    if (d === pattern) {
+                        console.log('[XToDiscord] Found filled bookmark pattern');
                         return true;
                     }
-                } else if (d.length < 100) {
-                    // 短いpathは塗りつぶしブックマークの可能性が高い
+                }
+                
+                // fillが設定されているかチェック
+                if (fill && fill !== 'none' && fill !== 'transparent' && fill !== 'currentColor') {
+                    console.log('[XToDiscord] Found filled path with fill:', fill);
+                    return true;
+                }
+                
+                // styleでfillが設定されているかチェック
+                if (style && style.includes('fill:') && !style.includes('fill:none')) {
+                    console.log('[XToDiscord] Found filled path with style:', style);
                     return true;
                 }
             }
         }
     }
     
-    // 方法3: クラス名でチェック
-    if (bookmarkButton.classList.contains('bookmarked') || 
-        bookmarkButton.classList.contains('active')) {
-        return true;
+    // 方法3: data属性やクラス名をチェック
+    const classes = Array.from(bookmarkButton.classList);
+    console.log('[XToDiscord] Button classes:', classes);
+    
+    // よくあるブックマーク済みを示すクラス名
+    const bookmarkedClasses = ['bookmarked', 'active', 'selected', 'on', 'filled'];
+    for (const cls of bookmarkedClasses) {
+        if (bookmarkButton.classList.contains(cls)) {
+            console.log('[XToDiscord] Found bookmarked class:', cls);
+            return true;
+        }
     }
     
+    console.log('[XToDiscord] No bookmark indicators found - assuming unbookmarked');
     return false;
 }
 
