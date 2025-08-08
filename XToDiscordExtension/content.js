@@ -4,8 +4,6 @@ let processedPosts = new Set();
 
 // 初期化
 (function() {
-    console.log('[XToDiscord] Content script loaded');
-    
     // Webhook URLを読み込み
     loadWebhookUrl();
     
@@ -19,7 +17,6 @@ let processedPosts = new Set();
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (request.type === 'WEBHOOK_URL_UPDATED') {
             webhookUrl = request.url;
-            console.log('[XToDiscord] Webhook URL updated');
         }
     });
 })();
@@ -28,7 +25,6 @@ function loadWebhookUrl() {
     chrome.storage.local.get(['discordWebhookUrl'], function(result) {
         if (result.discordWebhookUrl) {
             webhookUrl = result.discordWebhookUrl;
-            console.log('[XToDiscord] Webhook URL loaded');
         }
     });
 }
@@ -201,37 +197,23 @@ function addToBookmarkIfNeeded(post) {
             }
             
             if (!bookmarkButton) {
-                console.log('[XToDiscord] Bookmark button not found');
                 resolve(); // ボタンが見つからなくても続行
                 return;
             }
             
-            console.log('[XToDiscord] Found bookmark button:', bookmarkButton);
-            
             // ブックマーク状態を確認
-            console.log('[XToDiscord] === BEFORE CLICK ===');
             const isBookmarked = checkIfBookmarked(bookmarkButton);
             
             if (isBookmarked) {
-                console.log('[XToDiscord] ✅ Already bookmarked - keeping bookmark ON');
                 resolve();
                 return;
             }
             
             // ブックマークがOFFの場合のみONにする
-            console.log('[XToDiscord] ❌ Bookmark is OFF - turning ON...');
-            console.log('[XToDiscord] Clicking bookmark button...');
             bookmarkButton.click();
             
-            // 少し待ってからブックマーク追加を確認
+            // 少し待ってから完了
             setTimeout(() => {
-                console.log('[XToDiscord] === AFTER CLICK ===');
-                const nowBookmarked = checkIfBookmarked(bookmarkButton);
-                if (nowBookmarked) {
-                    console.log('[XToDiscord] ✅ Bookmark successfully turned ON');
-                } else {
-                    console.log('[XToDiscord] ⚠️ Bookmark add may have failed, but continuing...');
-                }
                 resolve();
             }, 500);
             
@@ -243,18 +225,15 @@ function addToBookmarkIfNeeded(post) {
 }
 
 function checkIfBookmarked(bookmarkButton) {
-    console.log('[XToDiscord] Checking bookmark status...');
-    
     // 方法1: aria-labelをチェック
     const ariaLabel = bookmarkButton.getAttribute('aria-label');
-    console.log('[XToDiscord] Aria-label:', ariaLabel);
     
     if (ariaLabel) {
         // 既にブックマーク済みの場合のラベル
         const bookmarkedLabels = [
             'ブックマークを削除',
             'ブックマークから削除',
-            'ブックマークに追加済み',  // ← これが重要！
+            'ブックマークに追加済み',
             'ブックマーク済み',
             'Remove from Bookmarks',
             'Remove Bookmark',
@@ -266,7 +245,6 @@ function checkIfBookmarked(bookmarkButton) {
         
         for (const label of bookmarkedLabels) {
             if (ariaLabel.includes(label)) {
-                console.log('[XToDiscord] Found bookmarked aria-label:', label);
                 return true;
             }
         }
@@ -286,7 +264,6 @@ function checkIfBookmarked(bookmarkButton) {
                  !ariaLabel.includes('済み') && 
                  !ariaLabel.includes('削除') && 
                  !ariaLabel.includes('Remove'))) {
-                console.log('[XToDiscord] Found unbookmarked aria-label:', label);
                 return false;
             }
         }
@@ -295,17 +272,12 @@ function checkIfBookmarked(bookmarkButton) {
     // 方法2: SVGアイコンの詳細チェック
     const svg = bookmarkButton.querySelector('svg');
     if (svg) {
-        console.log('[XToDiscord] Checking SVG paths...');
         const paths = svg.querySelectorAll('path');
         
         for (const path of paths) {
             const d = path.getAttribute('d');
             const fill = path.getAttribute('fill');
             const style = path.getAttribute('style');
-            
-            console.log('[XToDiscord] Path d:', d);
-            console.log('[XToDiscord] Path fill:', fill);
-            console.log('[XToDiscord] Path style:', style);
             
             if (d) {
                 // 塗りつぶされたブックマークアイコンのパターン
@@ -317,20 +289,17 @@ function checkIfBookmarked(bookmarkButton) {
                 // exactな一致をチェック
                 for (const pattern of filledBookmarkPatterns) {
                     if (d === pattern) {
-                        console.log('[XToDiscord] Found filled bookmark pattern');
                         return true;
                     }
                 }
                 
                 // fillが設定されているかチェック
                 if (fill && fill !== 'none' && fill !== 'transparent' && fill !== 'currentColor') {
-                    console.log('[XToDiscord] Found filled path with fill:', fill);
                     return true;
                 }
                 
                 // styleでfillが設定されているかチェック
                 if (style && style.includes('fill:') && !style.includes('fill:none')) {
-                    console.log('[XToDiscord] Found filled path with style:', style);
                     return true;
                 }
             }
@@ -338,19 +307,13 @@ function checkIfBookmarked(bookmarkButton) {
     }
     
     // 方法3: data属性やクラス名をチェック
-    const classes = Array.from(bookmarkButton.classList);
-    console.log('[XToDiscord] Button classes:', classes);
-    
-    // よくあるブックマーク済みを示すクラス名
     const bookmarkedClasses = ['bookmarked', 'active', 'selected', 'on', 'filled'];
     for (const cls of bookmarkedClasses) {
         if (bookmarkButton.classList.contains(cls)) {
-            console.log('[XToDiscord] Found bookmarked class:', cls);
             return true;
         }
     }
     
-    console.log('[XToDiscord] No bookmark indicators found - assuming unbookmarked');
     return false;
 }
 
@@ -388,8 +351,6 @@ function extractPostData(post) {
             }
         }
         
-        console.log('[XToDiscord] Extracted text:', text);
-        
         // ユーザー名を取得（複数の方法で試行）
         let username = '';
         let userHandle = '';
@@ -416,8 +377,6 @@ function extractPostData(post) {
             username = usernameElement.textContent || userHandle;
         }
         
-        console.log('[XToDiscord] Extracted username:', username);
-        
         // ポストURLを構築（可能な場合）
         let postUrl = '';
         const timeElement = post.querySelector('time');
@@ -434,8 +393,6 @@ function extractPostData(post) {
                 postUrl = `https://x.com${href}`;
             }
         }
-        
-        console.log('[XToDiscord] Extracted postUrl:', postUrl);
         
         return {
             text: text || 'テキストなし',
