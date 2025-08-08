@@ -196,21 +196,20 @@ function extractPostData(post) {
 }
 
 function sendToDiscord(postData) {
+    // ポストテキストとURLの両方を送信（検索可能 + 画像自動表示）
+    let content = '';
+    
+    // ポストテキストがあれば追加
+    if (postData.text && postData.text.trim()) {
+        content += `📝 **${postData.username}**: ${postData.text}\n\n`;
+    }
+    
+    // ポストURLを追加（画像自動表示用）
+    content += `${postData.postUrl}\n`;
+    content += `*Shared via Chrome Extension*`;
+    
     const payload = {
-        embeds: [{
-            title: "New X Post Shared",
-            description: postData.text,
-            url: postData.postUrl,
-            author: {
-                name: postData.username,
-                url: postData.userHandle ? `https://x.com/${postData.userHandle}` : undefined
-            },
-            footer: {
-                text: "Shared via Chrome Extension"
-            },
-            timestamp: new Date().toISOString(),
-            color: 0x1DA1F2 // Twitter blue
-        }]
+        content: content
     };
     
     return fetch(webhookUrl, {

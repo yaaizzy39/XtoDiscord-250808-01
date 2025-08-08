@@ -17,24 +17,24 @@ function validateDiscordWebhookUrl(url) {
 }
 
 /**
- * Discord Embedオブジェクトを作成
+ * Discord用のメッセージペイロードを作成
  * @param {Object} postData - ポストデータ
- * @returns {Object} Discord embed オブジェクト
+ * @returns {Object} Discord メッセージペイロード
  */
-function createDiscordEmbed(postData) {
+function createDiscordPayload(postData) {
+    let content = '';
+    
+    // ポストテキストがあれば追加
+    if (postData.text && postData.text.trim()) {
+        content += `📝 **${postData.username}**: ${postData.text}\n\n`;
+    }
+    
+    // ポストURLを追加（画像自動表示用）
+    content += `${postData.postUrl}\n`;
+    content += `*Shared via Chrome Extension*`;
+    
     return {
-        title: "New X Post Shared",
-        description: postData.text || "テキストなし",
-        url: postData.postUrl || "",
-        author: {
-            name: postData.username || "Unknown User",
-            url: postData.userHandle ? `https://x.com/${postData.userHandle}` : undefined
-        },
-        footer: {
-            text: "Shared via Chrome Extension"
-        },
-        timestamp: new Date().toISOString(),
-        color: 0x1DA1F2 // Twitter blue
+        content: content
     };
 }
 
@@ -45,9 +45,7 @@ function createDiscordEmbed(postData) {
  * @returns {Promise} 送信結果
  */
 async function sendDiscordWebhook(webhookUrl, postData) {
-    const payload = {
-        embeds: [createDiscordEmbed(postData)]
-    };
+    const payload = createDiscordPayload(postData);
     
     const response = await fetch(webhookUrl, {
         method: 'POST',
@@ -91,7 +89,7 @@ async function sendWithRetry(webhookUrl, postData, retryCount = 3) {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         validateDiscordWebhookUrl,
-        createDiscordEmbed,
+        createDiscordPayload,
         sendDiscordWebhook,
         sendWithRetry
     };
